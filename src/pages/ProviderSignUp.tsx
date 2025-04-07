@@ -14,6 +14,8 @@ import {
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AnimatedSection from '@/components/AnimatedSection';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Upload } from 'lucide-react';
 
 // Define available service categories
 const serviceCategories = [
@@ -60,7 +62,9 @@ const ProviderSignUp = () => {
     experience: '',
     location: '',
     phone: '',
+    serviceTitle: '',
   });
+  const [cv, setCV] = useState(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -78,6 +82,43 @@ const ProviderSignUp = () => {
       ...prev,
       serviceType: value
     }));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file type
+      if (!file.type.includes('pdf') && !file.type.includes('doc') && !file.type.includes('docx')) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF or Word document",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please upload a file smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Convert file to base64 for storage
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCV({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: event.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,6 +142,15 @@ const ProviderSignUp = () => {
       return;
     }
 
+    if (!cv) {
+      toast({
+        title: "CV Required",
+        description: "Please upload your CV before submitting",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -111,30 +161,50 @@ const ProviderSignUp = () => {
         throw new Error('Invalid service type selected');
       }
 
-      // In a real app, this would save to Firebase
-      // For demo purposes, we'll just save to localStorage
-      const providers = JSON.parse(localStorage.getItem('providers') || '[]');
+      // Create provider object with CV
       const newProvider = {
-        id: Date.now().toString(),
         ...formData,
+        cv: cv,
+        status: 'pending',
+        email: formData.email.toLowerCase(),
+        createdAt: new Date().toISOString(),
         serviceTitle: selectedService.title,
         serviceDescription: selectedService.description,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
       };
+
+      // Get existing providers
+      const existingProviders = JSON.parse(localStorage.getItem('providers') || '[]');
       
-      localStorage.setItem('providers', JSON.stringify([...providers, newProvider]));
+      // Check if email already exists
+      if (existingProviders.some(provider => provider.email === formData.email)) {
+        toast({
+          title: "Email Already Exists",
+          description: "This email is already registered",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Add new provider
+      const updatedProviders = [...existingProviders, newProvider];
+      
+      // Save to localStorage
+      localStorage.setItem('providers', JSON.stringify(updatedProviders));
+      
+      // Debug log
+      console.log('Provider registered:', newProvider);
       
       toast({
-        title: "Success!",
-        description: "Your account has been created successfully. Please wait for approval.",
+        title: "Registration Successful",
+        description: "Your application has been submitted for review",
       });
       
-      navigate('/provider-login');
+      navigate('/sign-in');
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create account. Please try again.",
+        title: "Registration Failed",
+        description: error.message || "Please try again later",
         variant: "destructive",
       });
     } finally {
@@ -159,145 +229,172 @@ const ProviderSignUp = () => {
             </AnimatedSection>
 
             <AnimatedSection animation="slide-in">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      placeholder="Enter first name"
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      type="text"
-                      placeholder="Enter last name"
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                </div>
+              <Card className="max-w-2xl mx-auto">
+                <CardHeader>
+                  <CardTitle>Service Provider Registration</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          name="firstName"
+                          type="text"
+                          placeholder="Enter first name"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          name="lastName"
+                          type="text"
+                          placeholder="Enter last name"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="serviceType">Service Type</Label>
-                  <Select
-                    value={formData.serviceType}
-                    onValueChange={handleServiceTypeChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a service type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {serviceCategories.map(service => (
-                        <SelectItem 
-                          key={service.id} 
-                          value={service.id}
+                    <div className="space-y-2">
+                      <Label htmlFor="serviceType">Service Type</Label>
+                      <Select
+                        value={formData.serviceType}
+                        onValueChange={handleServiceTypeChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a service type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviceCategories.map(service => (
+                            <SelectItem 
+                              key={service.id} 
+                              value={service.id}
+                            >
+                              {service.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="experience">Years of Experience</Label>
+                      <Input
+                        id="experience"
+                        name="experience"
+                        type="text"
+                        placeholder="e.g., 5 years"
+                        value={formData.experience}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Service Location</Label>
+                      <Input
+                        id="location"
+                        name="location"
+                        type="text"
+                        placeholder="e.g., San Francisco, CA"
+                        value={formData.location}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        placeholder="Create a password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        placeholder="Confirm your password"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cv">Upload CV (PDF or Word, max 5MB)</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="cv"
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => document.getElementById('cv').click()}
+                          className="w-full"
                         >
-                          {service.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {cv ? 'Change CV' : 'Upload CV'}
+                        </Button>
+                      </div>
+                      {cv && (
+                        <p className="text-sm text-muted-foreground">
+                          File uploaded: {cv.name}
+                        </p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="experience">Years of Experience</Label>
-                  <Input
-                    id="experience"
-                    name="experience"
-                    type="text"
-                    placeholder="e.g., 5 years"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Service Location</Label>
-                  <Input
-                    id="location"
-                    name="location"
-                    type="text"
-                    placeholder="e.g., San Francisco, CA"
-                    value={formData.location}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="Enter your phone number"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Create a password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating Account..." : "Create Account"}
-                </Button>
-
-                <p className="text-center text-sm text-foreground/70">
-                  Already have an account?{' '}
-                  <Link to="/provider-login" className="text-primary hover:underline">
-                    Sign in
-                  </Link>
-                </p>
-              </form>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Registering..." : "Register"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
             </AnimatedSection>
           </div>
         </div>

@@ -83,8 +83,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       await retryOperation(signInWithEmailAndPassword, auth, email, password);
+
+      // Check if user is a provider and update status
+      const providers = JSON.parse(localStorage.getItem('providers') || '[]');
+      const provider = providers.find(
+        p => p.email.toLowerCase() === email.toLowerCase()
+      );
+      
+      if (provider) {
+        // Store provider status
+        localStorage.setItem('currentProviderStatus', provider.status || 'pending');
+      }
     } catch (error) {
-      await handleAuthError(error as AuthError, 'signing in');
+      console.error('Sign in error:', error);
+      throw error;
     }
   };
 

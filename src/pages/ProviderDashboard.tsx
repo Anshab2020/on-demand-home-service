@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,14 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AnimatedSection from '@/components/AnimatedSection';
 import { Calendar, Clock, MapPin, Phone, Mail, Briefcase, CheckCircle, XCircle, Clock4, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface ProviderData {
   firstName: string;
@@ -39,6 +47,38 @@ const ProviderDashboard = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [status, setStatus] = useState('pending');
+
+  useEffect(() => {
+    const checkStatus = () => {
+      if (!user?.email) return;
+
+      // Get providers array
+      const providers = JSON.parse(localStorage.getItem('providers') || '[]');
+      
+      // Find current provider
+      const currentProvider = providers.find(
+        p => p.email.toLowerCase() === user.email.toLowerCase()
+      );
+
+      if (currentProvider) {
+        setStatus(currentProvider.status || 'pending');
+      }
+
+      setLoading(false);
+    };
+
+    // Check immediately
+    checkStatus();
+
+    // Set up interval to check periodically
+    const interval = setInterval(checkStatus, 3000);
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Function to load provider data and bookings
   const loadProviderData = () => {
@@ -75,7 +115,7 @@ const ProviderDashboard = () => {
 
   useEffect(() => {
     loadProviderData();
-  }, [navigate, toast]);
+  }, [navigate, toast, user]);
 
   const handleAcceptService = () => {
     if (!providerData) return;
@@ -155,16 +195,85 @@ const ProviderDashboard = () => {
     }
   };
 
+  const handleMarkAsCompleted = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setShowConfirmDialog(true);
+  };
+
+  const confirmCompletion = () => {
+    if (!selectedBooking) return;
+
+    try {
+      const allBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+      const updatedBookings = allBookings.map(booking => 
+        booking.id === selectedBooking.id 
+          ? { ...booking, status: 'completed', completedDate: new Date().toISOString() }
+          : booking
+      );
+      
+      localStorage.setItem('bookings', JSON.stringify(updatedBookings));
+      
+      toast({
+        title: "Service Completed",
+        description: "The service has been marked as completed.",
+      });
+
+      setShowConfirmDialog(false);
+      setSelectedBooking(null);
+      loadProviderData();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark service as completed. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="container py-8">
+        <Card>
+          <CardContent className="text-center py-6">
+            <p>Loading...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (!providerData) {
     return null;
+  }
+
+  if (status !== 'approved') {
+    return (
+      <div className="container py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-6">
+              <Badge className="bg-yellow-500 mb-4">
+                Pending Approval
+              </Badge>
+              <p className="text-muted-foreground">
+                Your account is pending approval from the admin. 
+                Please check back later.
+              </p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => window.location.reload()}
+              >
+                Check Status Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Show accept service prompt if provider hasn't accepted yet
@@ -388,6 +497,34 @@ const ProviderDashboard = () => {
       </main>
       
       <Footer />
+
+      {/* Completion Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Service Completion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark this service as completed? 
+              This will notify the customer that the service has been fulfilled.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              className="bg-green-500 hover:bg-green-600"
+              onClick={confirmCompletion}
+            >
+              Yes, Mark as Completed
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

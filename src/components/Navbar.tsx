@@ -83,6 +83,11 @@ const Navbar = () => {
             >
               Contact
             </Link>
+            {user && (
+              <Link to="/bookings" className="hover:text-primary">
+                My Bookings
+              </Link>
+            )}
           </div>
 
           {/* Desktop Auth Buttons */}

@@ -11,11 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AnimatedSection from '@/components/AnimatedSection';
-import { CheckCircle, XCircle, Clock, AlertCircle, Search, Database } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Search, Database, Upload } from 'lucide-react';
 
 interface Provider {
   id: string;
@@ -31,6 +32,13 @@ interface Provider {
   servicePrice: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  cv?: {
+    name: string;
+    type: string;
+    size: number;
+    data: string;
+  };
+  approvedAt?: string;
 }
 
 const AdminDashboard = () => {
@@ -41,6 +49,13 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const loadProviders = () => {
+    const allProviders = JSON.parse(localStorage.getItem('providers') || '[]');
+    console.log('Current providers:', allProviders); // Debug log
+    setProviders(allProviders);
+    setLoading(false);
+  };
+
   useEffect(() => {
     // Check if admin is logged in
     const adminEmail = localStorage.getItem('adminEmail');
@@ -49,15 +64,41 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Load providers from localStorage
-    const loadProviders = () => {
-      const savedProviders = JSON.parse(localStorage.getItem('providers') || '[]');
-      setProviders(savedProviders);
-      setLoading(false);
-    };
-
     loadProviders();
+    // Add event listener to update when providers change
+    window.addEventListener('storage', loadProviders);
+    
+    return () => {
+      window.removeEventListener('storage', loadProviders);
+    };
   }, [navigate]);
+
+  const handleApprove = (email) => {
+    // Get current providers array
+    const currentProviders = JSON.parse(localStorage.getItem('providers') || '[]');
+    
+    // Update the specific provider's status
+    const updatedProviders = currentProviders.map(provider => {
+      if (provider.email.toLowerCase() === email.toLowerCase()) {
+        return {
+          ...provider,
+          status: 'approved'
+        };
+      }
+      return provider;
+    });
+
+    // Save updated array back to localStorage
+    localStorage.setItem('providers', JSON.stringify(updatedProviders));
+    
+    // Update state
+    setProviders(updatedProviders);
+
+    toast({
+      title: "Provider Approved",
+      description: "Provider status has been updated successfully."
+    });
+  };
 
   const handleStatusChange = (providerId: string, newStatus: Provider['status']) => {
     // Get all providers from localStorage to ensure we have the complete data
@@ -125,6 +166,42 @@ const AdminDashboard = () => {
     provider.serviceType.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Filter providers by status
+  const approvedProviders = providers.filter((provider: any) => 
+    provider.status === 'approved'
+  );
+
+  const handleDownloadCV = (provider) => {
+    if (!provider.cv) {
+      toast({
+        title: "No CV Available",
+        description: "This provider hasn't uploaded a CV",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create download link
+    const link = document.createElement('a');
+    link.href = provider.cv.data;
+    link.download = provider.cv.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleClearStorage = () => {
+    if (window.confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+      localStorage.clear();
+      toast({
+        title: "Storage Cleared",
+        description: "All data has been cleared successfully.",
+      });
+      // Reload the page to reflect changes
+      window.location.reload();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -158,6 +235,9 @@ const AdminDashboard = () => {
                   <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Service Provider Data</DialogTitle>
+                      <DialogDescription>
+                        This dialog displays all service provider data
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4">
                       <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
@@ -174,6 +254,12 @@ const AdminDashboard = () => {
                   }}
                 >
                   Logout
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleClearStorage}
+                >
+                  Clear All Data
                 </Button>
               </div>
             </div>
@@ -303,35 +389,33 @@ const AdminDashboard = () => {
               </TabsContent>
 
               <TabsContent value="approved" className="space-y-4">
-                {filteredProviders
-                  .filter(provider => provider.status === 'approved')
-                  .map(provider => (
-                    <Card key={provider.id}>
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-semibold mb-2">
-                              {provider.firstName} {provider.lastName}
-                            </h3>
-                            <div className="space-y-2 text-sm text-foreground/70">
-                              <p>{provider.email}</p>
-                              <p>{provider.phone}</p>
-                              <p>Service Type: {provider.serviceType}</p>
-                              <p>Experience: {provider.experience}</p>
-                              <p>Location: {provider.location}</p>
-                              <p>Approved: {new Date(provider.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <Badge className={getStatusColor(provider.status)}>
-                              {getStatusIcon(provider.status)}
-                              {provider.status.charAt(0).toUpperCase() + provider.status.slice(1)}
-                            </Badge>
+                {approvedProviders.map((provider: any) => (
+                  <Card key={provider.email}>
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">
+                            {provider.firstName} {provider.lastName}
+                          </h3>
+                          <div className="space-y-2 text-sm text-foreground/70">
+                            <p>{provider.email}</p>
+                            <p>{provider.phone}</p>
+                            <p>Service Type: {provider.serviceType}</p>
+                            <p>Experience: {provider.experience}</p>
+                            <p>Location: {provider.location}</p>
+                            <p>Approved: {new Date(provider.createdAt).toLocaleDateString()}</p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge className={getStatusColor(provider.status)}>
+                            {getStatusIcon(provider.status)}
+                            {provider.status.charAt(0).toUpperCase() + provider.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </TabsContent>
 
               <TabsContent value="rejected" className="space-y-4">

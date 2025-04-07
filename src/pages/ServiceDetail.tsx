@@ -76,60 +76,36 @@ const ServiceDetail = () => {
     loadReviews();
   }, [id]);
   
-  const handleBooking = async () => {
+  const handleBookingClick = () => {
     if (!user) {
-      toast({
-        title: "Sign in Required",
-        description: "Please sign in to make a booking.",
-        variant: "destructive",
-      });
       navigate('/sign-in');
       return;
     }
 
-    if (!provider) {
-      toast({
-        title: "Error",
-        description: "Provider information not available.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const preferredPayment = localStorage.getItem('preferredPaymentMethod') || 'cash';
 
-    setIsBooking(true);
-    
-    // Create the booking
     const booking = {
       id: Date.now().toString(),
-      userId: user.uid,
-      userEmail: user.email,
-      userName: user.displayName || user.email,
-      serviceType: provider.serviceType,
-      serviceTitle: provider.serviceTitle,
-      providerEmail: provider.email,
-      providerName: `${provider.firstName} ${provider.lastName}`,
-      date: new Date().toISOString().split('T')[0], // Today's date
-      time: 'To be scheduled',
+      userId: user.email,
+      providerId: provider?.email,
+      serviceTitle: provider?.serviceTitle,
       status: 'pending',
-      location: provider.location,
-      price: provider.servicePrice,
-      isPaid: false,
+      paymentMethod: preferredPayment,
+      date: new Date().toISOString()
     };
 
-    // Store booking in localStorage
     const existingBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
     localStorage.setItem('bookings', JSON.stringify([...existingBookings, booking]));
-    
+
     toast({
-      title: "Booking Created",
-      description: "Please complete the payment to confirm your booking.",
+      title: "Booking Successful",
+      description: "Your service has been booked successfully.",
     });
-    
-    setIsBooking(false);
+
+    navigate('/bookings');
   };
 
   const handlePaymentSuccess = () => {
-    // Update the booking status to paid
     const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
     const updatedBookings = bookings.map((booking: any) => {
       if (booking.providerEmail === provider.email && booking.userEmail === user?.email) {
@@ -139,7 +115,6 @@ const ServiceDetail = () => {
     });
     localStorage.setItem('bookings', JSON.stringify(updatedBookings));
 
-    // Navigate to dashboard
     navigate('/dashboard');
   };
   
@@ -217,27 +192,12 @@ const ServiceDetail = () => {
               </div>
               
               <div className="md:ml-auto self-center">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button 
-                      className="rounded-full px-6 mb-3 w-full"
-                      disabled={isBooking}
-                    >
-                      {isBooking ? "Confirming Booking..." : user ? "Book Now" : "Sign in to Book"}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Complete Your Booking</DialogTitle>
-                    </DialogHeader>
-                    <PaymentForm
-                      amount={parsePrice(provider.servicePrice)}
-                      serviceTitle={provider.serviceTitle}
-                      providerName={`${provider.firstName} ${provider.lastName}`}
-                      onSuccess={handlePaymentSuccess}
-                    />
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  onClick={handleBookingClick}
+                  className="w-full"
+                >
+                  {user ? 'Book Now' : 'Sign in to Book'}
+                </Button>
                 <div className="flex gap-3">
                   <Button 
                     variant="outline" 
@@ -317,7 +277,6 @@ const ServiceDetail = () => {
                       providerEmail={id || ''} 
                       onSuccess={() => {
                         setShowReviewForm(false);
-                        // Reload reviews
                         const allReviews = JSON.parse(localStorage.getItem('reviews') || '[]');
                         const providerReviews = allReviews.filter((review: Review) => review.providerEmail === id);
                         setReviews(providerReviews);
@@ -374,10 +333,9 @@ const ServiceDetail = () => {
                   </div>
                   <Button 
                     className="w-full"
-                    onClick={handleBooking}
-                    disabled={isBooking}
+                    onClick={handleBookingClick}
                   >
-                    {isBooking ? "Confirming Booking..." : user ? "Book Now" : "Sign in to Book"}
+                    {user ? 'Book Now' : 'Sign in to Book'}
                   </Button>
                 </div>
               </AnimatedSection>

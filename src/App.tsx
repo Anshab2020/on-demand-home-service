@@ -20,6 +20,7 @@ import ProviderDashboard from "@/pages/ProviderDashboard";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ServiceProviderList from "@/pages/ServiceProviderList";
+import Bookings from '@/pages/Bookings';
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => (
                 }
               />
               <Route path="/services/:id" element={<ServiceProviderList />} />
+              <Route path="/bookings" element={<Bookings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
